@@ -2,8 +2,10 @@
 
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::Client;
-use inquire::{list_option::ListOption, validator::Validation, Confirm, MultiSelect};
+use inquire::{validator::MaxLengthValidator, Confirm, MultiSelect};
 use std::process;
+
+const MAX_BUCKETS: u8 = 5;
 
 #[tokio::main]
 async fn main() {
@@ -17,18 +19,29 @@ async fn main() {
         eprintln!("{}", err);
         process::exit(1)
     });
+
+    let validator = MaxLengthValidator::new(5)
+        .with_message(format!("Max of {} buckets can be selected", MAX_BUCKETS));
+
     let selected_buckets = MultiSelect::new("Select buckets to be removed", found_buckets)
+        .with_validator(validator)
         .prompt()
         .unwrap();
 
     println!("Deleting {} buckets", selected_buckets.len());
     println!("{}", selected_buckets.join("\n\t - "));
 
-    let confirmation = Confirm::new("Do you wish to proceed?")
-        .with_default(false)
-        .with_help_message("There's no turning back from here")
-        .prompt()
-        .unwrap_or(false);
+    let confirmation = Confirm::new(
+        format!(
+            "Do you wish to proceed? This action will delete {} buckets",
+            selected_buckets.len()
+        )
+        .as_str(),
+    )
+    .with_default(false)
+    .with_help_message("There's no turning back from here")
+    .prompt()
+    .unwrap_or(false);
 
     if !confirmation {
         println!("Quitting");
