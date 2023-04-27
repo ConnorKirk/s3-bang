@@ -2,10 +2,15 @@
 
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::Client;
-use inquire::{validator::MaxLengthValidator, Confirm, MultiSelect};
+use inquire::{
+    list_option::ListOption,
+    validator::{MaxLengthValidator, Validation},
+    Confirm, CustomUserError, MultiSelect,
+};
 use std::process;
 
 const MAX_BUCKETS: u8 = 5;
+const PROTECTED_BUCKET_NAMES: &[&str] = &["backup", "do-not-delete", "console"];
 
 #[tokio::main]
 async fn main() {
@@ -20,11 +25,8 @@ async fn main() {
         process::exit(1)
     });
 
-    let validator = MaxLengthValidator::new(5)
-        .with_message(format!("Max of {} buckets can be selected", MAX_BUCKETS));
-
     let selected_buckets = MultiSelect::new("Select buckets to be removed", found_buckets)
-        .with_validator(validator)
+        .with_validator(wrapper_validator)
         .prompt()
         .unwrap();
 
@@ -92,4 +94,45 @@ async fn list_buckets(client: &Client) -> Result<Vec<String>, aws_sdk_s3::Error>
         .map(|x| x.name().unwrap().to_owned())
         .collect();
     Ok(ret)
+}
+
+fn protect_names_validator(options: &[ListOption<&String>]) -> Result<Validation, CustomUserError> {
+    let invalid = options.iter().any(|option| {
+        PROTECTED_BUCKET_NAMES
+            .iter()
+            .any(|protected| option.value.contains(protected))
+    });
+
+    match invalid {
+        false => Ok(Validation::Valid),
+        true => Ok(Validation::Invalid(
+            "Cannot delete buckets with protected names".into(),
+        )),
+    }
+}
+
+fn length_validator(options: &[ListOption<&String>]) -> Result<Validation, CustomUserError> {
+    let length = options.len();
+    if length >= MAX_BUCKETS.into() {
+        return Ok(Validation::Invalid(
+            format!("Maximum of {} selections. You have {}", MAX_BUCKETS, length).into(),
+        ));
+    }
+
+    if options.len() < 1 {
+        return Ok(Validation::Invalid("Must select a bucket".into()));
+    }
+
+    Ok(Validation::Valid)
+}
+
+fn wrapper_validator(options: &[ListOption<&String>]) -> Result<Validation, CustomUserError> {
+    let validators = [protect_names_validator, length_validator];
+
+    for validator in validators {
+        if let Ok(Validation::Invalid(error)) = validator(options) {
+            return Ok(Validation::Invalid(error));
+        }
+    }
+    Ok(Validation::Valid)
 }
