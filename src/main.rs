@@ -3,9 +3,7 @@
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::Client;
 use inquire::{
-    list_option::ListOption,
-    validator::{MaxLengthValidator, Validation},
-    Confirm, CustomUserError, MultiSelect,
+    list_option::ListOption, validator::Validation, Confirm, CustomUserError, MultiSelect,
 };
 use std::process;
 
@@ -119,7 +117,7 @@ fn length_validator(options: &[ListOption<&String>]) -> Result<Validation, Custo
         ));
     }
 
-    if options.len() < 1 {
+    if options.is_empty() {
         return Ok(Validation::Invalid("Must select a bucket".into()));
     }
 
