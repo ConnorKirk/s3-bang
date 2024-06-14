@@ -111,7 +111,7 @@ fn protect_names_validator(options: &[ListOption<&String>]) -> Result<Validation
 
 fn length_validator(options: &[ListOption<&String>]) -> Result<Validation, CustomUserError> {
     let length = options.len();
-    if length >= MAX_BUCKETS.into() {
+    if length > MAX_BUCKETS.into() {
         return Ok(Validation::Invalid(
             format!("Maximum of {} selections. You have {}", MAX_BUCKETS, length).into(),
         ));
