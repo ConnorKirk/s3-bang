@@ -1,7 +1,7 @@
 #![allow(clippy::result_large_err)]
 
 use aws_config::meta::region::RegionProviderChain;
-use aws_sdk_s3::Client;
+use aws_sdk_s3::{error::DisplayErrorContext, Client};
 use inquire::{
     list_option::ListOption, validator::Validation, Confirm, CustomUserError, MultiSelect,
 };
@@ -19,7 +19,7 @@ async fn main() {
     println!("Finding buckets...");
 
     let found_buckets = list_buckets(&client).await.unwrap_or_else(|err| {
-        eprintln!("{}", err);
+        eprintln!("{}", DisplayErrorContext(&err));
         process::exit(1)
     });
 
@@ -51,10 +51,18 @@ async fn main() {
     for bucket in selected_buckets {
         println!("Deleting bucket: {}", bucket);
         empty_bucket(&client, &bucket).await.unwrap_or_else(|err| {
-            eprintln!("Error emptying bucket {}: {}", bucket, err);
+            eprintln!(
+                "Error emptying bucket {}: {}",
+                bucket,
+                DisplayErrorContext(&err)
+            );
         });
         delete_bucket(&client, &bucket).await.unwrap_or_else(|err| {
-            eprintln!("Error deleting bucket {}: {}", bucket, err);
+            eprintln!(
+                "Error deleting bucket {}: {}",
+                bucket,
+                DisplayErrorContext(&err)
+            );
         });
     }
 
